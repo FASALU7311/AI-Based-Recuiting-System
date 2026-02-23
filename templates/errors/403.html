@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-code">403</div>
+    <div class="error-message">Access Forbidden</div>
+    <div class="error-description">
+        <p>You don't have permission to access this page.</p>
+        <p>This area is restricted to recruiters only.</p>
+    </div>
+    <div class="error-actions">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Go to Dashboard
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-outline">
+            <i class="fas fa-home"></i> Go to Homepage
+        </a>
+    </div>
+</div>
+{% endblock %}

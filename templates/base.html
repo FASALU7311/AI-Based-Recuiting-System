@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Recruiting System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page-container">
+        <header class="header">
+            <div class="container header-container">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <h2>AI Recruiting System</h2>
+                </div>
+                <nav class="main-nav">
+                    <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.user_type == 'recruiter' %}
+                            <a href="{{ url_for('recruiter_dashboard') }}" class="nav-link">Recruiter Dashboard</a>
+                        {% else %}
+                            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+                    {% else %}
+                        <a href="{{ url_for('register') }}" class="nav-link">Register</a>
+                        <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                    {% endif %}
+                </nav>
+                <button class="mobile-menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages">
+                            {% for category, message in messages %}
+                                <div class="flash-message flash-{{ category }}">
+                                    <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                {% block content %}
+                {% endblock %}
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer-container">
+                <div class="footer-section">
+                    <h3>AI Recruiting System</h3>
+                    <p>Revolutionizing the hiring process with artificial intelligence.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="{{ url_for('index') }}">Home</a></li>
+                        {% if current_user.is_authenticated %}
+                            {% if current_user.user_type == 'recruiter' %}
+                                <li><a href="{{ url_for('recruiter_dashboard') }}">Recruiter Dashboard</a></li>
+                            {% else %}
+                                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li><a href="{{ url_for('register') }}">Register</a></li>
+                            <li><a href="{{ url_for('login') }}">Login</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>Contact Us</h3>
+                    <p>Email: info@airecruiting.com</p>
+                    <p>Phone: (123) 456-7890</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="container">
+                    <p>&copy; 2025 AI Recruiting System. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        document.querySelector('.mobile-menu-btn').addEventListener('click', function() {
+            document.querySelector('.main-nav').classList.toggle('active');
+        });
+    </script>
+</body>
+</html>

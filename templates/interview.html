@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Video Interview</h1>
+        <p class="subtitle">Position: <strong>{{ job_position }}</strong></p>
+    </div>
+    <div class="badge badge-high">AI Analyzing Video</div>
+    <div style="font-weight:bold; color:#666;">Progress: Question <span id="current-q-num">1</span> of <span id="total-q-num">7</span></div>
+</div>
+
+<div class="interview-container">
+    <!-- LEFT: Video Recording Screen -->
+    <div class="interview-main">
+        <div class="card">
+            <div class="card-header">
+                <h3>Recording</h3>
+                <!-- Timer -->
+                <div id="recording-timer" style="font-family: monospace; font-size: 24px; color: #dc3545; font-weight: bold;">00:00</div>
+            </div>
+            <div class="card-body">
+                <div class="video-container">
+                    <video id="preview" autoplay muted playsinline></video>
+                    <div class="video-overlay" id="video-overlay">
+                        <div class="recording-indicator" id="recording-indicator">
+                            <i class="fas fa-circle"></i> REC
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CURRENT ANSWER STATUS -->
+                <div id="answer-status" style="margin-top: 10px; color:#007bff; font-weight:600; display:none;">
+                    Answering...
+                </div>
+                
+                <!-- CONTROL BUTTONS -->
+                <div class="controls">
+                    <button id="start" class="btn btn-danger">
+                        <i class="fas fa-circle"></i> Start Recording
+                    </button>
+                    <button id="stop" class="btn btn-primary" disabled>
+                        <i class="fas fa-stop"></i> Stop Recording
+                    </button>
+                    
+                    <!-- Next Question Button -->
+                    <button id="next" class="btn btn-outline hidden">
+                        Next Question <i class="fas fa-arrow-right"></i>
+                    </button>
+                    
+                    <!-- Submit Button -->
+                    <button id="submit" class="btn btn-success hidden">
+                        <i class="fas fa-paper-plane"></i> Submit Interview
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- RIGHT: Questions Sidebar (All 7 Questions Visible) -->
+    <div class="interview-sidebar">
+        <div class="card">
+            <div class="card-header">
+                <h3>Interview Questions</h3>
+            </div>
+            <div class="card-body">
+                
+                <!-- INSTRUCTIONAL MESSAGE -->
+                <div id="instruction-text" style="text-align:center; padding:20px; color:#666;">
+                    <i class="fas fa-info-circle"></i> Click <strong>"Start Recording"</strong> to view Question 1.
+                </div>
+
+                <!-- DYNAMIC QUESTION LIST (All questions injected via JS) -->
+                <div id="questions-list">
+                    <!-- Questions will be rendered here by JS -->
+                </div>
+                
+                <div class="interview-tips">
+                    <h4><i class="fas fa-lightbulb"></i> Instructions</h4>
+                    <ul>
+                        <li>Click <strong>"Start Recording"</strong> to begin.</li>
+                        <li>Answer the question fully.</li>
+                        <li>Click <strong>"Stop Recording"</strong> when finished.</li>
+                        <li>Click <strong>"Next Question"</strong> to proceed.</li>
+                        <li>Complete all questions to submit.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    #recording-timer {
+        background: #f8f9fa;
+        padding: 5px 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    
+    /* Class to hide questions initially (Though all are visible now, this style is good for future logic if we want to dim past questions) */
+    .question-card {
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        background: white;
+        border: 1px solid #e9ecef;
+        display: block;
+    }
+    
+    /* Style for active question (Highlighted Blue) */
+    .active-question {
+        background-color: #e9ecef; /* Light blue tint */
+        border-left: 4px solid var(--primary);
+        padding-left: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Style for past questions (Dimmed Grey) */
+    .dimmed-question {
+        opacity: 0.6;
+        color: #6c757d; /* Darker text color */
+    }
+
+    .question-number {
+        font-weight: bold;
+        font-size: 18px;
+        color: var(--secondary);
+        margin-right: 10px;
+    }
+
+    .question-text {
+        font-size: 15px;
+        color: var(--dark);
+    }
+</style>
+
+<script>
+    // --- 1. DATA & CONFIG ---
+    const jobPosition = "{{ job_position }}";
+    let currentQuestionIndex = 0; // Start at 0 (Q1 is first)
+    let recordedBlobs = []; // Stores all recorded clips (Q1, Q2... Q7)
+    let mediaRecorder, stream, chunks = [];
+    let timerInterval, seconds = 0;
+    let isRecording = false;
+
+    // DOM Elements
+    const preview = document.getElementById('preview');
+    const questionsListContainer = document.getElementById('questions-list');
+    const instructionText = document.getElementById('instruction-text');
+    const answerStatusText = document.getElementById('answer-status');
+    const timerDisplay = document.getElementById('recording-timer');
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+    const nextBtn = document.getElementById('next');
+    const submitBtn = document.getElementById('submit');
+    const qNumDisplay = document.getElementById('current-q-num');
+    const totalQDisplay = document.getElementById('total-q-num');
+
+    // --- 2. QUESTION DATA (7 Questions) ---
+    let questions = [];
+
+    const q1 = "1. Tell me about yourself and your professional experience.";
+
+    // Specific Questions based on Role (Q2 - Q5)
+    if (jobPosition === 'Software Engineer') {
+        questions = [
+            q1,
+            "2. Describe your experience with Backend frameworks (e.g., Flask, Django) and Frontend technologies.",
+            "3. How do you approach debugging a complex issue in your code?",
+            "4. Tell us about a project where you optimized database performance.",
+            "5. What is your testing methodology for ensuring code quality?"
+        ];
+    } else if (jobPosition === 'Data Scientist') {
+        questions = [
+            q1,
+            "2. Explain a machine learning model you built from scratch and the algorithms used.",
+            "3. How do you handle data cleaning and missing values in a large dataset?",
+            "4. Describe a time when your model's results were counter-intuitive and how you fixed it.",
+            "5. What Big Data tools (Spark, Hadoop) have you used?"
+        ];
+    } else if (jobPosition === 'product Manager') {
+        questions = [ // Using simple naming for consistency
+            q1,
+            "2. How do you prioritize features for a product roadmap when resources are limited?",
+            "3. Describe a time you had to manage conflicting stakeholder requirements.",
+            "4. What metrics do you use to define success for a product launch?",
+            "5. Tell me about a product feature you launched that failed and what you learned."
+        ];
+    } else if (jobPosition === 'UX Designer') {
+        questions = [
+            q1,
+            "2. Walk us through your design process from brief to final prototype.",
+            "3. How do you incorporate user feedback into your design iterations?",
+            "4. Describe a challenge you faced regarding accessibility in a recent project.",
+            "5. What tools (Figma, Sketch, Adobe) do you prefer and why?"
+        ];
+    } else {
+        // Default / Generic
+        questions = [
+            q1,
+            "2. Why do you want to work in this role?",
+            "3. Dimed a challenging project you handled.",
+            "4. How do you handle deadlines and pressure?",
+            "5. Describe your ideal work environment."
+        ];
+    }
+
+    // Generic Questions (Q6 - Q7) - Added to all roles
+    questions.push("6. Describe a situation where you had to learn a new technology quickly.");
+    questions.push("7. Where do you see yourself professionally in 5 years?");
+
+    totalQDisplay.innerText = questions.length;
+
+    // --- 3. RENDER FUNCTIONS ---
+
+    // Render List (All 7 Questions visible initially)
+    function initQuestionsList() {
+        let html = "";
+        questions.forEach((q, index) => {
+            // All questions are visible initially. 
+            // Use 'dimmed-question' style for visual hierarchy (Current active is highlighted, Past/Future are dimmed).
+            html += `
+                <div class="question-card dimmed-question" id="q-card-${index}">
+                    <div class="question-number">${index + 1}</div>
+                    <div class="question-text">${q}</div>
+                </div>
+            `;
+        });
+        questionsListContainer.innerHTML = html;
+    }
+
+    // Show specific question and highlight it
+    function showQuestion(index) {
+        currentQuestionIndex = index;
+        qNumDisplay.innerText = index + 1;
+
+        // Loop through all items and toggle classes
+        questions.forEach((_, i) => {
+            const item = document.getElementById(`q-card-${i}`);
+            if (!item) return;
+
+            if (i === index) {
+                // Active Question: Highlight and Bring to front
+                item.classList.remove('dimmed-question');
+                item.classList.add('active-question');
+            } else {
+                // Past/Future Question: Dimmed
+                item.classList.add('dimmed-question');
+                item.classList.remove('active-question');
+            }
+        });
+        
+        // Scroll sidebar to active question
+        const activeCard = document.getElementById(`q-card-${index}`);
+        if (activeCard) {
+            activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // Camera Setup
+    async function initCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            preview.srcObject = stream;
+            
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    // Accumulate chunks into global array
+                    chunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                // Stop camera and save blob to list
+                const blob = new Blob(chunks, { type: "video/webm" });
+                
+                if (blob.size > 100) {
+                    // Only add if significant
+                    recordedBlobs.push(blob); 
+                    console.log(`Saved clip for Q${currentQuestionIndex + 1}. Total clips: ${recordedBlobs.length}`);
+                } else {
+                    console.warn("Blob too small, discarded.");
+                }
+                
+                chunks = []; // Clear for next segment
+
+                // UI Updates
+                stopBtn.disabled = true;
+                startBtn.disabled = false;
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.add('hidden');
+                document.getElementById("video-overlay").style.display = "none";
+                answerStatusText.style.display = "none";
+            };
+        } catch (err) {
+            console.error("Camera error:", err);
+            alert("Could not access your camera and microphone. Please enable permissions.");
+        }
+    }
+
+    // Timer Logic
+    function startTimer() {
+        seconds = 0;
+        timerDisplay.innerText = "00:00";
+        timerInterval = setInterval(() => {
+            seconds++;
+            timerDisplay.innerText = new Date(seconds * 1000).toISOString().substr(14, 5);
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+    }
+
+    // --- 4. INITIALIZATION ---
+    initQuestionsList();
+    initCamera();
+    showQuestion(0); // Show Q1 initially and highlight it
+
+    // --- 5. EVENT LISTENERS ---
+
+    // START RECORDING
+    startBtn.onclick = () => {
+        if (isRecording) {
+            alert("Already recording.");
+            return;
+        }
+
+        console.log("Start Recording clicked. Clearing previous chunks...");
+        recordedBlobs = []; // Reset clips array for NEW take
+        
+        isRecording = true;
+        updateInstructionText(false); // Hide "Start Recording" text
+        
+        // Reveal Q1
+        showQuestion(0);
+        
+        if (mediaRecorder.state === "inactive") {
+            mediaRecorder.start();
+            startTimer();
+            
+            // UI Updates
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            // Hide "Next" initially until recording is stopped
+            nextBtn.classList.add('hidden');
+            submitBtn.classList.add('hidden');
+            document.getElementById("video-overlay").style.display = "flex";
+        }
+    };
+
+    // STOP RECORDING
+    stopBtn.onclick = () => {
+        if (!isRecording) {
+            console.warn("Stop clicked but not recording.");
+            return;
+        }
+
+        console.log("Stop Recording clicked.");
+        isRecording = false;
+
+        if (mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+        } else {
+            console.warn("Recorder not in recording state.");
+        }
+
+        // Save Video (Accumulate into single take)
+        // Logic: Save blob if valid size
+        if (chunks.length > 0) {
+            const blob = new Blob(chunks, { type: "video/webm" });
+            
+            if (blob.size > 100) {
+                recordedBlobs.push(blob);
+                console.log(`Clip saved for Q${currentQuestionIndex + 1}. Total clips: ${recordedBlobs.length}`);
+            }
+        }
+
+        stopTimer();
+        document.getElementById("video-overlay").style.display = "none";
+        
+        // Update UI: Answer Saved
+        answerStatusText.innerText = "Answer Saved";
+        answerStatusText.style.display = "block";
+
+        // CRITICAL: Enable Next Button ONLY if we have a video for the NEXT question
+        // Logic: We want to move to Q(index + 1).
+        // Validation: recordedBlobs.length must be > currentQuestionIndex.
+        if (recordedBlobs.length > currentQuestionIndex) {
+            nextBtn.classList.remove('hidden');
+            console.log("Next button enabled for Q" + (currentQuestionIndex + 1));
+        } else {
+            nextBtn.classList.add('hidden');
+            console.warn("Next button disabled: No video recorded for this question yet.");
+        }
+    };
+
+    // NEXT QUESTION
+    nextBtn.onclick = () => {
+        // Logic: Move to next question (Q(index + 1)
+        let nextIndex = currentQuestionIndex + 1;
+        
+        if (nextIndex < questions.length) {
+            // Reveal next question
+            showQuestion(nextIndex);
+            
+            // Prepare UI (Start button enabled, Stop disabled)
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            nextBtn.classList.remove('hidden');
+            
+            // Update Status Text
+            updateInstructionText(false); // Back to "Click Start Recording"
+            
+            // Note: Start button is disabled initially in HTML, so we enable it here manually for the first take
+            if (recordedBlobs.length === 0) {
+                startBtn.disabled = true; // If no clips, can't move to Q2 yet
+            } else {
+                startBtn.disabled = false; // Enable Start for recording Q2
+            }
+        } else {
+            // Finished all questions
+            console.log("All questions completed.");
+            
+            // Hide Next/Start buttons
+            startBtn.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+            
+            // Enable Submit
+            submitBtn.classList.remove('hidden');
+        }
+    };
+
+    // SUBMIT INTERVIEW
+    submitBtn.onclick = () => {
+        if (recordedBlobs.length === 0) {
+            alert("Please record at least one answer.");
+            return;
+        }
+        
+        if (!confirm(`Submit ${recordedBlobs.length} answers for AI analysis?`)) return;
+
+        // Concatenate all clips into a single continuous video file
+        const singleVideoBlob = new Blob(recordedBlobs, { type: "video/webm" });
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+        // Convert final blob to Base64
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            const formData = new FormData();
+            formData.append("video", singleVideoBlob, "interview_video.webm");
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = "/dashboard"; 
+                } else {
+                    alert("Upload failed. Please try again.");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Interview';
+                }
+            })
+            .catch(error => {
+                console.error("Upload error:", error);
+                alert("Upload error. Please check your connection.");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Interview';
+            });
+        };
+        reader.readAsDataURL(singleVideoBlob);
+    };
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Candidate Dashboard</h1>
+    <p class="subtitle">Track your application progress and status</p>
+</div>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">
+        <i class="fas fa-upload"></i> Upload Resume
+    </a>
+</div>
+
+
+{% if applications %}
+<div class="card">
+    <div class="card-header">
+        <h3>Your Applications</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Resume Score</th>
+                        <th>Interview Score</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in applications %}
+                    <tr>
+                        <td>{{ app.job_position }}</td>
+                        <td>
+                            <div class="score-badge score-{{ 'high' if app.resume_score >= 80 else 'medium' if app.resume_score >= 60 else 'low' }}">
+                                {{ "%.2f"|format(app.resume_score) }}
+                            </div>
+                        </td>
+                        
+                        <!-- FIXED: Interview Score Column -->
+                        <td>
+                            {% if app.interview %}
+                                <div class="score-badge score-{{ 'high' if app.interview.interview_score >= 80 else 'medium' if app.interview.interview_score >= 60 else 'low' }}">
+                                    {{ "%.2f"|format(app.interview.interview_score) }}
+                                </div>
+                            {% elif app.status == "Under Review" %}
+                                <span class="text-muted" style="font-style: italic;">Reviewing...</span>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <span class="status-badge status-{{ app.status.lower() }}">{{ app.status }}</span>
+                        </td>
+                        
+                        <!-- FIXED: Actions Column -->
+                        <td>
+                            <!-- START INTERVIEW BUTTON -->
+                            {% if app.resume_score > 50 and not app.interview %}
+                                <a href="{{ url_for('interview', app_id=app.id) }}" class="btn btn-sm btn-primary" style="margin-right: 5px;">
+                                    <i class="fas fa-video"></i> Start Interview
+                                </a>
+                            {% elif app.status == "Under Review" %}
+                                <span class="text-muted"><i class="fas fa-check"></i> Submitted</span>
+                            {% endif %}
+
+                            <!-- NEW DELETE BUTTON -->
+                            <!-- Use a form for POST request to avoid accidental deletion -->
+                            <form action="{{ url_for('delete_application', app_id=app.id) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Delete Application" onclick="return confirm('Are you sure you want to delete this application? This cannot be undone.');">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-file-alt"></i>
+    <h3>No applications yet</h3>
+    <p>Upload your resume to get started with the application process.</p>
+    <a href="{{ url_for('upload') }}" class="btn btn-primary">
+        <i class="fas fa-upload"></i> Upload Resume
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}
