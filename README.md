@@ -1,4 +1,4 @@
-  **🤖 AI-Based Recruiting System**
+#  **🤖 AI-Based Recruiting System**
 
 An intelligent, Flask-based hiring platform that automates resume screening and video interview evaluation using AI-driven scoring techniques.
 
